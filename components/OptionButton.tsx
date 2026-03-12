@@ -1,5 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, View, ViewStyle } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, Text, StyleSheet, View, ViewStyle, Animated } from 'react-native';
 import { Colors, Radii, FontSize, FontWeight, Spacing, Shadow } from '../constants/theme';
 
 interface OptionButtonProps {
@@ -17,22 +17,54 @@ export default function OptionButton({
   onPress,
   style,
 }: OptionButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 0,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 4,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.78}
+    <Pressable
       onPress={onPress}
-      style={[styles.button, selected && styles.selected, style]}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={style}
     >
-      <View style={styles.dot}>
-        {selected && <View style={styles.dotInner} />}
-      </View>
-      <View style={styles.textWrap}>
-        <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
-        {description ? (
-          <Text style={[styles.desc, selected && styles.descSelected]}>{description}</Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
+      {({ pressed }) => (
+        <Animated.View
+          style={[
+            styles.button,
+            selected && styles.selected,
+            pressed && (selected ? styles.selectedPressed : styles.unselectedPressed),
+            { transform: [{ scale }] },
+          ]}
+        >
+          <View style={[styles.dot, selected && styles.dotSelected]}>
+            {selected && <View style={styles.dotInner} />}
+          </View>
+          <View style={styles.textWrap}>
+            <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
+            {description ? (
+              <Text style={[styles.desc, selected && styles.descSelected]}>{description}</Text>
+            ) : null}
+          </View>
+        </Animated.View>
+      )}
+    </Pressable>
   );
 }
 
@@ -53,6 +85,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.green700,
     backgroundColor: Colors.green50,
   },
+  selectedPressed: {
+    borderColor: Colors.green800,
+    backgroundColor: Colors.green100,
+  },
+  unselectedPressed: {
+    backgroundColor: Colors.beige50,
+    borderColor: Colors.borderMedium,
+  },
   dot: {
     width: 20,
     height: 20,
@@ -61,6 +101,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderMedium,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dotSelected: {
+    borderColor: Colors.green700,
   },
   dotInner: {
     width: 10,

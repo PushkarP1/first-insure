@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
-  TouchableOpacity,
+  Pressable,
   Text,
   StyleSheet,
   ActivityIndicator,
-  View,
   ViewStyle,
+  Animated,
 } from 'react-native';
 import { Colors, Radii, FontSize, FontWeight, Spacing } from '../constants/theme';
 
@@ -19,6 +19,12 @@ interface ButtonProps {
   fullWidth?: boolean;
 }
 
+const PRESS_BG: Record<string, string> = {
+  primary:   Colors.green900,
+  secondary: Colors.green50,
+  ghost:     Colors.beige200,
+};
+
 export default function Button({
   label,
   onPress,
@@ -28,38 +34,66 @@ export default function Button({
   style,
   fullWidth = true,
 }: ButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
   const isDisabled = disabled || loading;
 
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 0,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 4,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.82}
+    <Pressable
       onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={isDisabled}
-      style={[
-        styles.base,
-        variant === 'primary' && styles.primary,
-        variant === 'secondary' && styles.secondary,
-        variant === 'ghost' && styles.ghost,
-        fullWidth && styles.fullWidth,
-        isDisabled && styles.disabled,
-        style,
-      ]}
     >
-      {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? Colors.white : Colors.green800} />
-      ) : (
-        <Text
+      {({ pressed }) => (
+        <Animated.View
           style={[
-            styles.label,
-            variant === 'primary' && styles.labelPrimary,
-            variant === 'secondary' && styles.labelSecondary,
-            variant === 'ghost' && styles.labelGhost,
+            styles.base,
+            variant === 'primary' && styles.primary,
+            variant === 'secondary' && styles.secondary,
+            variant === 'ghost' && styles.ghost,
+            fullWidth && styles.fullWidth,
+            isDisabled && styles.disabled,
+            pressed && { backgroundColor: PRESS_BG[variant] },
+            variant === 'secondary' && pressed && styles.secondaryPressed,
+            { transform: [{ scale }] },
+            style,
           ]}
         >
-          {label}
-        </Text>
+          {loading ? (
+            <ActivityIndicator color={variant === 'primary' ? Colors.white : Colors.green800} />
+          ) : (
+            <Text
+              style={[
+                styles.label,
+                variant === 'primary' && styles.labelPrimary,
+                variant === 'secondary' && styles.labelSecondary,
+                variant === 'ghost' && styles.labelGhost,
+              ]}
+            >
+              {label}
+            </Text>
+          )}
+        </Animated.View>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -81,6 +115,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1.5,
     borderColor: Colors.green800,
+  },
+  secondaryPressed: {
+    borderColor: Colors.green900,
   },
   ghost: {
     backgroundColor: Colors.beige100,

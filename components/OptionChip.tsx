@@ -1,5 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, Text, StyleSheet, ViewStyle, Animated } from 'react-native';
 import { Colors, Radii, FontSize, FontWeight, Spacing } from '../constants/theme';
 
 interface OptionChipProps {
@@ -10,14 +10,46 @@ interface OptionChipProps {
 }
 
 export default function OptionChip({ label, selected, onPress, style }: OptionChipProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 0,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 4,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.75}
+    <Pressable
       onPress={onPress}
-      style={[styles.chip, selected && styles.selected, style]}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={style}
     >
-      <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
-    </TouchableOpacity>
+      {({ pressed }) => (
+        <Animated.View
+          style={[
+            styles.chip,
+            selected && styles.selected,
+            pressed && (selected ? styles.selectedPressed : styles.unselectedPressed),
+            { transform: [{ scale }] },
+          ]}
+        >
+          <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
+        </Animated.View>
+      )}
+    </Pressable>
   );
 }
 
@@ -35,6 +67,14 @@ const styles = StyleSheet.create({
   selected: {
     backgroundColor: Colors.green800,
     borderColor: Colors.green800,
+  },
+  selectedPressed: {
+    backgroundColor: Colors.green900,
+    borderColor: Colors.green900,
+  },
+  unselectedPressed: {
+    backgroundColor: Colors.beige100,
+    borderColor: Colors.borderMedium,
   },
   label: {
     fontSize: FontSize.sm,

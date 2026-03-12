@@ -1,20 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   SafeAreaView,
-  ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { AlertTriangle, Check, ArrowLeft, Download, FileText } from 'lucide-react-native';
+import { AlertTriangle, Check, ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSize, FontWeight, Radii, Shadow } from '../../constants/theme';
 import { useWizard } from '../../context/WizardContext';
 import { getInsuranceRecommendation, InsuranceRecommendation } from '../../services/openai';
 import SmartNote from '../../components/SmartNote';
 import Button from '../../components/Button';
+import AILoadingOverlay from '../../components/AILoadingOverlay';
 
 const RISK_COLORS = {
   low: { bar: Colors.green600, label: Colors.green800, bg: Colors.green50 },
@@ -22,23 +22,34 @@ const RISK_COLORS = {
   high: { bar: Colors.error, label: Colors.error, bg: Colors.errorBg },
 };
 
+const MIN_ANIMATION_MS = 2000;
+
 export default function ResultsScreen() {
   const { state, reset } = useWizard();
   const [result, setResult] = useState<InsuranceRecommendation | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [showOverlay, setShowOverlay] = useState(true);
+  const startTime = useRef(Date.now());
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    setError(null);
+    startTime.current = Date.now();
 
     getInsuranceRecommendation(state)
-      .then((rec) => { if (mounted) setResult(rec); })
-      .catch((err: unknown) => {
-        if (mounted) setError(err instanceof Error ? err.message : 'Something went wrong.');
+      .then((rec) => {
+        if (!mounted) return;
+        setResult(rec);
+        const elapsed = Date.now() - startTime.current;
+        const remaining = Math.max(0, MIN_ANIMATION_MS - elapsed);
+        setTimeout(() => { if (mounted) setShowOverlay(false); }, remaining);
       })
-      .finally(() => { if (mounted) setLoading(false); });
+      .catch((err: unknown) => {
+        if (!mounted) return;
+        setError(err instanceof Error ? err.message : 'Something went wrong.');
+        const elapsed = Date.now() - startTime.current;
+        const remaining = Math.max(0, MIN_ANIMATION_MS - elapsed);
+        setTimeout(() => { if (mounted) setShowOverlay(false); }, remaining);
+      });
 
     return () => { mounted = false; };
   }, []);
@@ -48,23 +59,7 @@ export default function ResultsScreen() {
     router.replace('/');
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingContainer}>
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color={Colors.green800} />
-            <Text style={styles.loadingTitle}>Analysing your profile…</Text>
-            <Text style={styles.loadingBody}>
-              Our AI is reviewing your home, belongings, and lifestyle to find your best coverage match.
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error || !result) {
+  if (error && !showOverlay) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.loadingContainer}>
@@ -79,7 +74,7 @@ export default function ResultsScreen() {
     );
   }
 
-  const riskStyle = RISK_COLORS[result.riskColor];
+  const riskStyle = result ? RISK_COLORS[result.riskColor] : RISK_COLORS.low;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -88,113 +83,111 @@ export default function ResultsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.topRow}>
-          <View>
-            <Text style={styles.eyebrow}>AI Results · Step 5 of 5</Text>
-            <Text style={styles.title}>Your AI Coverage{'\n'}Recommendation</Text>
+        {/* Header — only render content once result is ready */}
+        {result && <>
+          {/* Header */}
+          <View style={styles.topRow}>
+            <View>
+              <Text style={styles.eyebrow}>AI Results · Step 5 of 5</Text>
+              <Text style={styles.title}>Your AI Coverage{'\n'}Recommendation</Text>
+            </View>
+            <View style={styles.logoMark}>
+              <Text style={styles.logoLetter}>FI</Text>
+            </View>
           </View>
-          <View style={styles.logoMark}>
-            <Text style={styles.logoLetter}>FI</Text>
-          </View>
-        </View>
 
-        {/* Recommended plan card */}
-        <View style={styles.planCard}>
-          <Text style={styles.planEyebrow}>AI RECOMMENDED PLAN</Text>
-          <Text style={styles.planName}>{result.planName}</Text>
-          <View style={styles.planDetails}>
-            <View style={styles.planRow}>
-              <Text style={styles.planDetailLabel}>Contents</Text>
-              <Text style={styles.planDetailValue}>{result.contentsCoverage}</Text>
+          {/* Recommended plan card */}
+          <View style={styles.planCard}>
+            <Text style={styles.planEyebrow}>AI RECOMMENDED PLAN</Text>
+            <Text style={styles.planName}>{result.planName}</Text>
+            <View style={styles.planDetails}>
+              <View style={styles.planRow}>
+                <Text style={styles.planDetailLabel}>Contents</Text>
+                <Text style={styles.planDetailValue}>{result.contentsCoverage}</Text>
+              </View>
+              <View style={styles.planDivider} />
+              <View style={styles.planRow}>
+                <Text style={styles.planDetailLabel}>Liability</Text>
+                <Text style={styles.planDetailValue}>{result.liabilityCoverage}</Text>
+              </View>
+              <View style={styles.planDivider} />
+              <View style={styles.planRow}>
+                <Text style={styles.planDetailLabel}>Deductible</Text>
+                <Text style={styles.planDetailValue}>{result.deductible}</Text>
+              </View>
+              <View style={styles.planDivider} />
+              <View style={styles.planRow}>
+                <Text style={styles.planDetailLabel}>Est. monthly</Text>
+                <Text style={[styles.planDetailValue, styles.planPrice]}>
+                  {result.monthlyEstimate}
+                </Text>
+              </View>
             </View>
-            <View style={styles.planDivider} />
-            <View style={styles.planRow}>
-              <Text style={styles.planDetailLabel}>Liability</Text>
-              <Text style={styles.planDetailValue}>{result.liabilityCoverage}</Text>
-            </View>
-            <View style={styles.planDivider} />
-            <View style={styles.planRow}>
-              <Text style={styles.planDetailLabel}>Deductible</Text>
-              <Text style={styles.planDetailValue}>{result.deductible}</Text>
-            </View>
-            <View style={styles.planDivider} />
-            <View style={styles.planRow}>
-              <Text style={styles.planDetailLabel}>Est. monthly</Text>
-              <Text style={[styles.planDetailValue, styles.planPrice]}>
-                {result.monthlyEstimate}
+          </View>
+
+          {/* Why AI picked this */}
+          <View style={styles.explanationCard}>
+            <Text style={styles.sectionLabel}>WHY AI PICKED THIS</Text>
+            <Text style={styles.explanationText}>{result.explanation}</Text>
+          </View>
+
+          {/* Underinsured warning */}
+          {result.underinsuredWarning && (
+            <SmartNote
+              variant="warning"
+              title="Underinsurance alert"
+              body={result.underinsuredWarning}
+            />
+          )}
+
+          {/* Risk score */}
+          <View style={styles.riskCard}>
+            <View style={styles.riskHeader}>
+              <Text style={styles.sectionLabel}>UNDERINSURED RISK SCORE</Text>
+              <Text style={[styles.riskBadge, { color: riskStyle.label, backgroundColor: riskStyle.bg }]}>
+                {result.riskLabel}
               </Text>
             </View>
-          </View>
-        </View>
-
-        {/* Why AI picked this */}
-        <View style={styles.explanationCard}>
-          <Text style={styles.sectionLabel}>WHY AI PICKED THIS</Text>
-          <Text style={styles.explanationText}>{result.explanation}</Text>
-        </View>
-
-        {/* Underinsured warning */}
-        {result.underinsuredWarning && (
-          <SmartNote
-            variant="warning"
-            title="Underinsurance alert"
-            body={result.underinsuredWarning}
-          />
-        )}
-
-        {/* Risk score */}
-        <View style={styles.riskCard}>
-          <View style={styles.riskHeader}>
-            <Text style={styles.sectionLabel}>UNDERINSURED RISK SCORE</Text>
-            <Text style={[styles.riskBadge, { color: riskStyle.label, backgroundColor: riskStyle.bg }]}>
-              {result.riskLabel}
-            </Text>
-          </View>
-          <View style={styles.riskTrack}>
-            <View style={[styles.riskFill, { width: `${result.riskScore}%`, backgroundColor: riskStyle.bar }]} />
-          </View>
-        </View>
-
-        {/* Add-ons */}
-        {state.showAddOns !== false && result.addOns.length > 0 && (
-          <View style={styles.addOnsSection}>
-            <Text style={styles.sectionLabel}>SUGGESTED ADD-ONS</Text>
-            <View style={styles.addOnList}>
-              {result.addOns.map((addon) => (
-                <View key={addon} style={styles.addOnItem}>
-                  <Check size={16} color={Colors.green700} strokeWidth={2.5} />
-                  <Text style={styles.addOnText}>{addon}</Text>
-                </View>
-              ))}
+            <View style={styles.riskTrack}>
+              <View style={[styles.riskFill, { width: `${result.riskScore}%`, backgroundColor: riskStyle.bar }]} />
             </View>
           </View>
-        )}
 
-        {/* CTA */}
-        <Button
-          label="Get My Quote →"
-          onPress={() => {/* navigate to quote flow */}}
-        />
+          {/* Add-ons */}
+          {state.showAddOns !== false && result.addOns.length > 0 && (
+            <View style={styles.addOnsSection}>
+              <Text style={styles.sectionLabel}>SUGGESTED ADD-ONS</Text>
+              <View style={styles.addOnList}>
+                {result.addOns.map((addon) => (
+                  <View key={addon} style={styles.addOnItem}>
+                    <Check size={16} color={Colors.green700} strokeWidth={2.5} />
+                    <Text style={styles.addOnText}>{addon}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
-        <Button
-          label="Download Coverage Summary"
-          variant="secondary"
-          onPress={() => {/* export/share */}}
-        />
+          {/* CTA */}
+          <Button label="Get My Quote →" onPress={() => {}} />
+          <Button label="Download Coverage Summary" variant="secondary" onPress={() => {}} />
 
-        {/* Start over */}
-        <TouchableOpacity onPress={handleStartOver} style={styles.startOver}>
-          <ArrowLeft size={14} color={Colors.textSecondary} strokeWidth={2} />
-          <Text style={styles.startOverText}>Start over with new details</Text>
-        </TouchableOpacity>
+          {/* Start over */}
+          <TouchableOpacity onPress={handleStartOver} style={styles.startOver}>
+            <ArrowLeft size={14} color={Colors.textSecondary} strokeWidth={2} />
+            <Text style={styles.startOverText}>Start over with new details</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.disclaimer}>
-          This is an AI-generated recommendation for informational purposes only. Actual coverage,
-          terms, and pricing are subject to insurer underwriting. Please consult a licensed broker
-          before purchasing.
-        </Text>
+          <Text style={styles.disclaimer}>
+            This is an AI-generated recommendation for informational purposes only. Actual coverage,
+            terms, and pricing are subject to insurer underwriting. Please consult a licensed broker
+            before purchasing.
+          </Text>
+        </>}
       </ScrollView>
+
+      {/* AI loading overlay — shows for minimum 2 seconds */}
+      <AILoadingOverlay visible={showOverlay} />
     </SafeAreaView>
   );
 }
@@ -212,6 +205,9 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.xxl,
     gap: Spacing.lg,
+  },
+  placeholder: {
+    height: 400,
   },
   loadingContainer: {
     flex: 1,

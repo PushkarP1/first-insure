@@ -72,19 +72,19 @@ export default function EntryScreen() {
           ))}
         </View>
 
-        {/* Trust badge */}
-        <View style={styles.trustBadge}>
-          <Text style={styles.trustText}>
-            ✓ Approx. 5 steps · No account needed · Results saveable later
-          </Text>
-        </View>
-
         {/* CTA */}
         <Button
           label="Start My Coverage Check →"
           onPress={() => router.push('/wizard/step1')}
           style={styles.cta}
         />
+
+        {/* Trust badge */}
+        <View style={styles.trustBadge}>
+          <Text style={styles.trustText}>
+            ✓ Approx. 5 steps · No account needed · Results saveable later
+          </Text>
+        </View>
 
         <Text style={styles.finePrint}>
           No commitment. We help you understand options — you decide what's right for you.
